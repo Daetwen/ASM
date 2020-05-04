@@ -7,8 +7,11 @@ position dw 648
 Lives dw 1
 count dw 0
 ArrayBots dw 5 dup(0)
-ArrayBotsDirections db 5 dup(1,2,3,3,4)
-
+ArrayBotsDirections dw 5 dup(1,2,3,3,4)
+ArrayBotIsObjectAhead dw 5 dup(0)
+ArrayBotIsObjectBehind dw 5 dup(0) 
+ArrayScore db 6 dup('S','C','O','R','E',' ')
+ArrayGameOver db 9 dup('G','A','M','E',' ','O','V','E','R')
 .code
 
 PrintHorizontalBorder proc
@@ -188,8 +191,19 @@ Loop_PrintBorders1:
     mov cx,4
     inc si
     cmp si,1
-    je Loop_PrintBorders1 
-
+    je Loop_PrintBorders1
+    push cx
+    push ax
+    mov ah,1
+    mov al,178
+    mov cx,4
+    mov di,170 
+Loop_PrintBorders2:
+    mov es:[di],ax
+    add di,10 
+    loop Loop_PrintBorders2
+    pop ax
+    pop cx
     ret
 PrintBorders endp
 
@@ -247,7 +261,21 @@ End_Moving proc
     pop dx     
     pop cx 
     pop si
-    pop ax         
+    pop ax
+    mov ax,0003
+    int 10h
+    mov ax,0B800h
+    mov es,ax
+    mov di,0
+    mov cx,9
+    mov si,1830
+    mov bh,04
+End_MovingCycle: 
+    mov bl,ArrayGameOver[di]
+    mov es:[si],bx
+    inc di
+    add si,2
+    loop End_MovingCycle            
     mov ax, 4c00h
     int 21h
     ret
@@ -324,21 +352,59 @@ End_IsPoint:
     ret
 IsPoint endp    
 
-IsBonusByBot proc
+IsObjectByBotAhead proc
     push ax
+    push bx
     push si
     mov ah,2
     mov al,48
-    cmp es:[si],ax
+    mov bh,15
+    mov bl,249
+    cmp es:[di],ax
     je Bonus_pointByBot
-    jmp End_IsBonusByBot
+    cmp es:[di],bx
+    je Point_pointByBot
+    mov byte ptr ArrayBotIsObjectAhead[si],0
+    jmp End_IsBonusByBotAhead
 Bonus_pointByBot:
-    call PrintOneBonus
-End_IsBonusByBot:
+    mov byte ptr ArrayBotIsObjectAhead[si],2
+    jmp End_IsBonusByBotAhead
+Point_pointByBot:
+    mov byte ptr ArrayBotIsObjectAhead[si],1    
+End_IsBonusByBotAhead:
     pop si
+    pop bx
     pop ax
     ret
-IsBonusByBot endp
+IsObjectByBotAhead endp
+
+IsObjectByBotBehind proc
+    push ax
+    push bx
+    push si
+    mov ah,2
+    mov al,48
+    mov bh,15
+    mov bl,249
+    cmp ArrayBotIsObjectBehind[si],2
+    je Bonus_pointByBotYes
+    cmp ArrayBotIsObjectBehind[si],1
+    je Point_pointByBotYes
+    jmp Emptu_pointByBotYes
+Bonus_pointByBotYes:
+    mov es:[di],ax
+    jmp End_IsBonusByBotBehind
+Point_pointByBotYes:
+    mov es:[di],bx 
+    jmp End_IsBonusByBotBehind
+Emptu_pointByBotYes:
+    mov byte ptr es:[di],' '        
+End_IsBonusByBotBehind:
+    pop si
+    pop bx
+    pop ax
+    ret
+IsObjectByBotBehind endp
 
 IsDeathByBot proc
     push bx
@@ -361,8 +427,8 @@ End_IsDeathByBot:
     pop cx
     pop bx
     ret
-IsDeathByBot endp    
-
+IsDeathByBot endp       
+    
 PrintCount proc
     push bx
     push cx
@@ -380,7 +446,7 @@ Convert:
     inc cx           
     or ax, ax
     jnz Convert
-    xor si,si
+    mov si,12
 Show1:
     pop dx 
     mov es:[si],dx           
@@ -437,7 +503,11 @@ IsWorld:
 SpawnBots endp    
 
 MoveBotUp proc
-    mov di,ArrayBots[si]    
+    mov di,ArrayBots[si]
+    push ax
+    mov ax,ArrayBotIsObjectAhead[si]
+    mov ArrayBotIsObjectBehind[si],ax
+    pop ax   
     push si
     mov si,di
     sub si,160
@@ -447,11 +517,11 @@ MoveBotUp proc
     pop si
     cmp dx,1
     je EndMoveBotUp
-    mov byte ptr es:[di],' '
-    push si
-    mov si,di
-    call IsBonusByBot
-    pop si
+    push di
+    sub di,160
+    call IsObjectByBotAhead
+    pop di
+    call IsObjectByBotBehind
     sub di,160
     mov es:[di],bx
     mov ArrayBots[si],di
@@ -461,7 +531,11 @@ EndMoveBotUp:
 MoveBotUp endp     
     
 MoveBotDown proc
-    mov di,ArrayBots[si] 
+    mov di,ArrayBots[si]
+    push ax
+    mov ax,ArrayBotIsObjectAhead[si]
+    mov ArrayBotIsObjectBehind[si],ax
+    pop ax 
     push si
     mov si,di
     add si,160
@@ -470,13 +544,13 @@ MoveBotDown proc
     call IsDeathByBot
     pop si
     cmp dx,1
-    je EndMoveBotDown 
-    mov byte ptr es:[di],' '
+    je EndMoveBotDown
+    push di
+    add di,160   
+    call IsObjectByBotAhead
+    pop di
+    call IsObjectByBotBehind
     add di,160
-    push si
-    mov si,di
-    call IsBonusByBot
-    pop si
     mov es:[di],bx
     mov ArrayBots[si],di
 EndMoveBotDown:
@@ -485,7 +559,11 @@ EndMoveBotDown:
 MoveBotDown endp    
     
 MoveBotLeft proc
-    mov di,ArrayBots[si]    
+    mov di,ArrayBots[si]
+    push ax
+    mov ax,ArrayBotIsObjectAhead[si]
+    mov ArrayBotIsObjectBehind[si],ax
+    pop ax    
     push si
     mov si,di
     sub si,2
@@ -494,13 +572,13 @@ MoveBotLeft proc
     call IsDeathByBot
     pop si
     cmp dx,1
-    je EndMoveBotLeft 
-    mov byte ptr es:[di],' '
+    je EndMoveBotLeft
+    push di
     sub di,2
-    push si
-    mov si,di
-    call IsBonusByBot
-    pop si
+    call IsObjectByBotAhead
+    pop di
+    call IsObjectByBotBehind 
+    sub di,2
     mov es:[di],bx
     mov ArrayBots[si],di
 EndMoveBotLeft:
@@ -509,7 +587,11 @@ EndMoveBotLeft:
 MoveBotLeft endp     
     
 MoveBotRight proc
-    mov di,ArrayBots[si]    
+    mov di,ArrayBots[si]
+    push ax
+    mov ax,ArrayBotIsObjectAhead[si]
+    mov ArrayBotIsObjectBehind[si],ax
+    pop ax    
     push si
     mov si,di
     add si,2
@@ -519,12 +601,12 @@ MoveBotRight proc
     pop si
     cmp dx,1
     je EndMoveBotRight 
-    mov byte ptr es:[di],' '
+    push di
     add di,2
-    push si
-    mov si,di
-    call IsBonusByBot
-    pop si
+    call IsObjectByBotAhead
+    pop di
+    call IsObjectByBotBehind
+    add di,2
     mov es:[di],bx
     mov ArrayBots[si],di
 EndMoveBotRight:
@@ -538,8 +620,7 @@ AllMoving proc
     push cx
     push dx
     push bx
-    
-    push ax
+    push ax 
     xor ax,ax
     call PrintCount
     pop ax
@@ -850,6 +931,27 @@ main:
     call PrintBorders
     call PrintPoints
     
+    push si
+    push ax
+    push bx
+    push di
+    push cx
+    mov cx,6
+    mov di,0
+    mov si,0 
+    mov bh,04
+CountCycle: 
+    mov bl,ArrayScore[di]
+    mov es:[si],bx
+    inc di
+    add si,2
+    loop CountCycle
+    pop cx
+    pop di
+    pop bx
+    pop ax
+    pop si
+    
     push cx
     mov cx,20
 Loop_PrintBonus:
@@ -871,5 +973,4 @@ Loop_PrintBonus:
 EndGame:     
     mov ax, 4c00h
     int 21h 
-;ends
 end main
