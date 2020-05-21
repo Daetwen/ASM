@@ -112,6 +112,8 @@ Makeparams proc
 sravn:    
     cmp cmd_line[si],' '
     jne nextstep
+    cmp cmd_line[si],'  '
+    jne nextstep
     call SkipSpaces
     inc argc
     cmp argc,2
@@ -208,6 +210,8 @@ IsNumberValid endp
 SkipSpaces proc
 SkipCycle:    
     cmp cmd_line[si],' '
+    je skip
+    cmp cmd_line[si],'  '
     je skip
     jmp EndSkip
 skip:
