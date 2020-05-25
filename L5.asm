@@ -3,9 +3,9 @@
 .data
 sumbl db 1 dup(0)
 argc dw 0
-maxcmdsize equ 126
+maxcmdsize equ 125
 cmd_length dw ?
-cmd_line db maxcmdsize dup(?)
+cmd_line db maxcmdsize+2,?,maxcmdsize dup(?)
 buf db maxcmdsize+2,?,maxcmdsize dup('$')  
 filename db 126 dup("$")
 position dw 0
@@ -26,6 +26,7 @@ StringAmpleAmountMsg db "Satisfying number of lines: $"
 StringNewStr db 13,10,"$"
 StringScobka db ") $"
 StringSizeMsg db ".   size: $"
+flag db 0
 .code
 
 
@@ -111,8 +112,6 @@ Makeparams proc
     xor di,di   
 sravn:    
     cmp cmd_line[si],' '
-    jne nextstep
-    cmp cmd_line[si],'  '
     jne nextstep
     call SkipSpaces
     inc argc
@@ -211,8 +210,6 @@ SkipSpaces proc
 SkipCycle:    
     cmp cmd_line[si],' '
     je skip
-    cmp cmd_line[si],'  '
-    je skip
     jmp EndSkip
 skip:
     inc si
@@ -282,16 +279,28 @@ ReadCycle:
     int 21h
     jc ErrorExit2
     mov cx,ax
-    jcxz Close
+    jcxz Close 
+    
+    ;mov ah,40h
+    ;xchg bx,di
+    ;int 21h
+    ;xchg di,bx
+    ;jc Close
+    
     inc si
     cmp sumbl,13
-    je EndRead
+    je EndRead333
     cmp sumbl,10
-    je Decr 
+    je EndRead0 
     jmp ReadCycle
-Decr:
-    dec si
-    jmp ReadCycle    
+EndRead333:
+    mov flag,1
+    jmp EndRead
+EndRead0:
+    cmp flag,1
+    jne EndRead
+    mov flag,0
+    dec stringinfile         
 EndRead:
     dec si     
     call IsEnough   
