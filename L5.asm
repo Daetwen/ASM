@@ -8,7 +8,6 @@ cmd_length dw ?
 cmd_line db maxcmdsize+2,?,maxcmdsize dup(?)
 buf db maxcmdsize+2,?,maxcmdsize dup('$')  
 filename db 126 dup("$")
-position dw 0
 localsize dw 0
 number dw 0
 stringinfile dw 0
@@ -19,14 +18,16 @@ StringFileErrorOpenMsg db "File Error Open", 13,10, "$"
 StringFileErrorCloseMsg db "File Error Close", 13,10, "$"
 StringBeginMsg db "The program has begun ", 13,10, "$"
 StringErrorParsMsg db "Error pars params in comand line",13,10,"$" 
-StringErrorOwerflowMsg db "Error Owerflow of size: size your entered biger the 32767",13,10,"$"
+StringErrorOwerflowMsg db "Error Owerflow of size: size your entered biger then 65535",13,10,"$"
 StringEndMsg db "The program has end ", 13,10, "$"
 StringinFileMsg db "The number of the matching line in the file: $"
 StringAmpleAmountMsg db "Satisfying number of lines: $"
 StringNewStr db 13,10,"$"
 StringScobka db ") $"
 StringSizeMsg db ".   size: $"
+StringPlusMsg db " + $"
 flag db 0
+counter db 0
 .code
 
 
@@ -70,19 +71,14 @@ Show1:
 Show_AX endp
 
 IsEnough proc
-    push si
-    mov si,stringinfile
-    inc si
-    mov stringinfile,si
-    pop si
+    inc stringinfile
     push bx
-    mov bx,si
-    add position,si
-    cmp bx,localsize
+    cmp counter,0
+    jg finaly
+    cmp si,localsize
     jle EndIsEnough
-    mov bx,number
-    inc bx
-    mov number,bx
+finaly:    
+    inc number
     push ax
     mov ax,number
     call Show_AX
@@ -93,6 +89,20 @@ IsEnough proc
     mov ax,stringinfile
     call Show_AX
     Print_str StringSizeMsg
+    cmp counter,0
+    je finaly2
+    push ax
+    push cx
+    xor cx,cx
+    mov cl,counter
+    mov ax,65535 
+IsEnoughCycle:
+    call Show_AX
+    Print_str StringPlusMsg
+    loop IsEnoughCycle
+    pop cx
+    pop ax
+finaly2:        
     mov ax,si
     call Show_AX
     pop ax
@@ -158,6 +168,8 @@ thirdcycle:
     mov localsize,ax
     pop bx
     pop ax
+    jc ErrorEnded1
+    
     
     push ax
     xor ax,ax
@@ -168,12 +180,6 @@ thirdcycle:
     jc ErrorEnded1
     inc di
     loop thirdcycle
-    push cx
-    xor cx,cx
-    call IsNumberValid
-    cmp cx,1
-    je ErrorEnded1
-    pop cx
     jmp EndMakeparams    
 ErrorEnded1:
     pop cx
@@ -193,18 +199,7 @@ EndMakeparams:
     pop si
     pop di
     ret
-Makeparams endp    
-
-IsNumberValid proc
-    cmp localsize,32767
-    jle Valid
-    mov cx,1
-    jmp ExitIsNumberValid    
-Valid:
-    mov cx,0
-ExitIsNumberValid:          
-    ret
-IsNumberValid endp    
+Makeparams endp        
 
 SkipSpaces proc
 SkipCycle:    
@@ -256,9 +251,6 @@ ErrorExit1:
     Print_str StringErrorComandLineMsg
     jmp Exit
 ErrorExit2:
-    mov ah,3Eh
-    int 21h
-    jc ErrorExit3
     Print_str StringFileErrorOpenMsg
     jmp Exit
 ErrorExit3:
@@ -268,7 +260,7 @@ Exit:
     mov ax, 4c00h
     int 21h
 
-    Read proc
+Read proc
     push cx
     push si
     xor si,si
@@ -288,11 +280,17 @@ ReadCycle:
     ;jc Close
     
     inc si
+    cmp si,65535
+    je @count
+lstep:    
     cmp sumbl,13
     je EndRead333
     cmp sumbl,10
     je EndRead0 
     jmp ReadCycle
+@count:
+    inc counter
+    jmp lstep    
 EndRead333:
     mov flag,1
     jmp EndRead
@@ -323,7 +321,14 @@ Ended proc
     pop ax
     Print_str StringNewStr
     Print_str StringFileCloseMsg
+    jmp endEnded
+ErrorExitl:
+    Print_str StringFileErrorCloseMsg                
+    Print_str StringEndMsg    
+    mov ax, 4c00h
+    int 21h
+endEnded:    
     ret
 Ended endp        
-    
+
 end start
