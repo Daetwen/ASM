@@ -18,6 +18,7 @@ StringFileErrorOpenMsg db "File Error Open", 13,10, "$"
 StringFileErrorCloseMsg db "File Error Close", 13,10, "$"
 StringErrorAllocatedMsg db "Error allocated memory", 13,10, "$"
 StringErrorStartMsg db "Error start other program", 13,10, "$"
+StringErrorCMDMsg db "CMD line is empty", 13,10,"$"
 StringBeginMsg db "The program has begun ", 13,10, "$"
 StringErrorParsMsg db "Error pars params in comand line",13,10,"$" 
 StringErrorOwerflowMsg db "Error Owerflow of size: size your entered bigger then 255",13,10,"$"
@@ -190,6 +191,8 @@ start:
     mov ds,ax
     Print_str StringBeginMsg
     mov cmd_length,bx
+    cmp cmd_length,0
+    je  ErrorExit00
 
     call Makeparams    
     
@@ -215,6 +218,9 @@ MakeCycle:
     call Run
 	loop MakeCycle
     jmp Exit
+ErrorExit00: 
+    Print_str StringErrorCMDMsg
+    jmp Exit 
 ErrorExit0:
     Print_str StringErrorAllocatedMsg
     jmp Exit    
