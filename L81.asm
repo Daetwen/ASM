@@ -110,7 +110,7 @@ ErrorParsPoint:
 MakeParams endp
 
 
-newIRQ1 proc               
+newIRQ1 proc far              
 	pushf                 
 	call cs:oldIRQ1  
 	;cli                     
